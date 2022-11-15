@@ -1,29 +1,47 @@
 #QMainWindow ----------------
 # we have created main window in qt designer that is imported
-#QApplication----------
+#QApplication----------------
 #every single PyQt5 app needs one instance of a queue application in order to be executed 
-#loadui -------------
+#loadui ---------------------
 #this will enable us to load the ui from qt designer into our python code
-# QMainWindow,QApplication,QFileDialog
 from PyQt5.QtWidgets import QMainWindow,QApplication,QFileDialog
 from PyQt5.uic import loadUi
-from PyQt5.QtGui import QFont
-from PyQt5 import QtWidgets
+from PyQt5.QtGui import QFont,QSyntaxHighlighter
+from PyQt5 import QtWidgets     #QPlainTextEdit
+from PyQt5 import QtGui         #QFontDatabase,QColor,QTextCharFormat
 import sys
-from pygments import highlight
-from pygments.lexers import PythonLexer
-from pygments.formatters import NullFormatter
+import re
+from PyQt5.QtCore import Qt
+
+class Highlighter(QSyntaxHighlighter):
+	def __init__(self, parent=None):
+		super().__init__(parent)
+		self._mapping = {}
+
+	def add_mapping(self, pattern, pattern_format):
+		self._mapping[pattern] = pattern_format
+
+	def highlightBlock(self, text_block):
+		for pattern, fmt in self._mapping.items():
+			for match in re.finditer(pattern, text_block):
+				start, end = match.span()
+				self.setFormat(start, end-start, fmt)
 
 
 
 class PadMain(QMainWindow):#by adding QMainWindow it will have same property of QMainWindow but have additional things
     def __init__(self):    #constructor
-        super(PadMain,self).__init__() #super constructor
+        super(PadMain,self).__init__()#super constructor
         loadUi("qtmain.ui",self) #will load main.ui into class and take parameter by self
     
         self.current_path=None
-        self.setWindowTitle("Untitled - PyPad")
+        self.setWindowTitle("Untitled - PyPad")      
 
+        self.highlighter = Highlighter()
+        self.setUpEditor()
+
+
+#>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
         self.actionUndo.triggered.connect(self.Undo)
         self.actionRedu.triggered.connect(self.Redu)
         self.actionCopy_2.triggered.connect(self.Copy)
@@ -43,7 +61,38 @@ class PadMain(QMainWindow):#by adding QMainWindow it will have same property of 
         self.action26.triggered.connect(lambda: self.change_size(28))
         self.action32.triggered.connect(lambda: self.change_size(32))
         self.actionExit.triggered.connect(exit)
+#>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 
+    def setUpEditor(self): #setting up text editor and highlighter
+
+         #highlight words like print, if, else etc.
+         function_format = QtGui.QTextCharFormat()
+         function_format.setForeground(Qt.red)
+         function_format.setFontItalic(True)
+         pattern = "\\bprint\\b"
+         self.highlighter.add_mapping(pattern, function_format)
+
+         #highlight any word between ""
+         
+         function_format = QtGui.QTextCharFormat()
+         function_format.setForeground(Qt.green)
+        #function_format.setForeground(Qt.red)
+         function_format.setFontItalic(True)
+         pattern = r'"\w+\"'
+         self.highlighter.add_mapping(pattern, function_format)      
+
+         #highlight # symbol
+         comment_format = QtGui.QTextCharFormat()
+         comment_format.setBackground(QtGui.QColor("#77ff77"))
+         pattern = r'#.*$'
+         self.highlighter.add_mapping(pattern, comment_format)
+
+         font = QtGui.QFontDatabase.systemFont(QtGui.QFontDatabase.FixedFont)
+         font.setPointSize(16)
+         self.textEdit.setFont(font)
+
+         self.highlighter.setDocument(self.textEdit.document())
+            
 
     def Paste(self):
         self.textEdit.paste()
@@ -72,8 +121,7 @@ class PadMain(QMainWindow):#by adding QMainWindow it will have same property of 
         print(fname)
         if fname!="":
             with open(fname,"r") as f:
-                a = highlight(f.read(),PythonLexer(),NullFormatter())
-                self.textEdit.setText(a)
+                self.textEdit.setText(f.read())
         self.current_path=fname
 
     def saveFile(self):
@@ -131,7 +179,9 @@ class PadMain(QMainWindow):#by adding QMainWindow it will have same property of 
 
 if __name__=='__main__':
     app=QApplication(sys.argv)
-    ui=PadMain()
-    ui.show()
-    app.exec_()
-
+    MyApp=PadMain()
+    MyApp.show()
+    try:
+        sys.exit(app.exec_())
+    except SystemExit:
+        print("Closing Window....")
